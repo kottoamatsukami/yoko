@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "yokoprotocol"
+name = "yoko"
 version = "0.1.0"
 description = ""
 authors = ["Maksim Shushkevich <meshushkevich@edu.hse.ru>"]
