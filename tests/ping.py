@@ -1,6 +1,6 @@
 import time
 
-from core import YokoSync
+from yoko import YokoSync
 
 
 def main():

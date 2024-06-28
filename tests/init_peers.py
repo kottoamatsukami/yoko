@@ -1,4 +1,4 @@
-from core import YokoSync
+from yoko import YokoSync
 
 
 def init():

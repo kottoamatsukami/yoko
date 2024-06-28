@@ -1,5 +1,5 @@
-from core.token import *
-from core.packages import *
+from yoko.token import *
+from yoko.packages import *
 from queue import Queue
 from hashlib import sha256
 

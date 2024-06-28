@@ -1,5 +1,5 @@
 from tests.init_peers import init
-from core import YokoSync
+from yoko import YokoSync
 
 import _thread as thread
 import random
