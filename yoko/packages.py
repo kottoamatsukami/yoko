@@ -21,14 +21,9 @@ def pong() -> dict:
     }
 
 
-def srp() -> dict:
-    return {
-        'class': SRP
-    }
-
-
-def missed(orders: list[int]):
+def missed(orders: list[int], hash_):
     return {
         'class': MISSED,
-        'orders': orders
+        'orders': orders,
+        'hash': hash_,
     }

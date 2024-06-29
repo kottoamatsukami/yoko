@@ -17,7 +17,8 @@ def main():
     peer_b.connect(peer_a.get_token())
 
     for _ in range(int(input("Enter num of iters: "))):
-        print("="*50)
+        print("="*64)
         print(f'INFO: {peer_a}')
         print(f'INFO: {peer_b}')
-        time.sleep(2)
+        assert peer_a.buffer.empty() and peer_b.buffer.empty()
+        time.sleep(1)

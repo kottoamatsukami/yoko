@@ -10,12 +10,11 @@ def client_routine(client: YokoSync):
     while True:
         status, package = client.receive()
         if status:
-            print('[STATUS]: SUCCESSFUL')
             print(package)
         else:
-            print('[STATUS]: FAILED')
+            print('[STATUS]: CLIENT FAILED')
 
-        time.sleep(random.randint(100, 300) / 100)
+        time.sleep(random.randint(10, 30) / 100)
 
 
 def server_routine(server: YokoSync):
@@ -26,11 +25,9 @@ def server_routine(server: YokoSync):
             'price': random.randint(70, 110),
         }
         status = server.send(package)
-        if status:
-            print('[STATUS]: SUCCESSFUL')
-        else:
-            print('[STATUS]: FAILED')
-        time.sleep(random.randint(100, 300) / 100)
+        if not status:
+            print('[STATUS]: SERVER FAILED')
+        time.sleep(random.randint(10, 30) / 100)
 
 
 def main():

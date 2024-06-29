@@ -54,8 +54,10 @@ class YokoSync:
 
     def disconnect(self):
         self.target_addr = None
+        self.ping        = float('inf')
 
     def send(self, package: dict):
+        self.zero_buffer()
         json_package = json.dumps(package).encode('utf-8')
         package_hash = sha256(json_package).hexdigest()[:HASH_PREFIX_SIZE]
 
@@ -66,15 +68,13 @@ class YokoSync:
                 'class': CHUNK,
                 'chunk': chunk,
                 'order': order,
+                'hash' : package_hash,
             }
 
         header = {
             'class': 'header',
             'hash': package_hash,
             'size': len(packages),
-
-            # rules
-            'RECV_BUFFSIZE': RECV_BUFFSIZE,
         }
         requested_chunks = {i for i in range(header['size'])}
 
@@ -83,9 +83,9 @@ class YokoSync:
             # emptying buffer
             for _ in range(self.buffer.qsize()):
                 package = self.buffer.get()
-                if package == srp():
+                if   package['class'] == SRP and package['hash'] == package_hash:
                     return True
-                elif package['class'] == MISSED:
+                elif package['class'] == MISSED and package['hash'] == package_hash:
                     requested_chunks = set(package['orders'])
 
             # Send all missed chunks
@@ -96,10 +96,14 @@ class YokoSync:
         return len(requested_chunks) == 0
 
     def receive(self):
+        self.zero_buffer()
+
+        # get header
         chunks   = {}
         header   = None
-        attempts = 0
-        while attempts < HEADER_ATTEMPTS and self.is_alive:
+        while header is None and self.is_alive:
+            if self.buffer.empty():
+                continue
             package  = self.buffer.get()
             if package['class'] == HEADER:
                 header = package
@@ -108,30 +112,35 @@ class YokoSync:
                 chunks[package['order']] = package
             else:
                 self.__put_to_buffer(package)
-            attempts += 1
 
         if header is None:
             return False, {}
 
+        # remove incorrect chunks
+        for chunk_order in chunks.copy():
+            if chunks[chunk_order]['hash'] != header['hash']:
+                del chunks[chunk_order]
+
+        # get missing chunks
         missing = {i for i in range(header['size']) if i not in chunks}
 
         while self.is_alive:
-            #                             | is it necessary? |
             while not self.buffer.empty() and len(missing) > 0:
                 package = self.buffer.get()
-                if package['class'] == CHUNK and package['order'] in missing:
+                if package['class'] == CHUNK and package['order'] in missing and package['hash'] == header['hash']:
                     chunks[package['order']] = package
                     missing.remove(package['order'])
 
             if len(missing) == 0:
                 break
 
-            self.__send(missed(orders=list(missing)))
+            self.__send(missed(orders=list(missing), hash_=header['hash']))
 
         if len(missing) != 0:
             return False, {}
 
-        self.__send(srp())
+        # send complete response
+        self.__send({'class': SRP, 'hash': header['hash']})
 
         # reconstruct package
         total_package = b''
@@ -142,6 +151,7 @@ class YokoSync:
             total_package = json.loads(total_package)
             return True, total_package
         except json.JSONDecodeError:
+            print('DECODE ERROR', total_package)
             return False, {}
 
     def __thread_udphp(self):
@@ -201,6 +211,9 @@ class YokoSync:
 
     def get_ping(self) -> float:
         return self.ping
+
+    def zero_buffer(self):
+        self.buffer = Queue(maxsize=BUFFER_SIZE)
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}({self.target_addr}/{self.is_alive}): ping={self.ping:.3f}, buffer={self.buffer.qsize()}"

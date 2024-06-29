@@ -1,4 +1,4 @@
-from tests import ping, recv, hard, send, xray, idle, client_server
+from tests import *
 import colorama
 import os
 
@@ -8,11 +8,11 @@ EXAMPLES = {
     'ping' : ping,
     'recv' : recv,
     'send' : send,
-    'hard' : hard,
+    'chat' : crazy_chat,
     'xray' : xray,
     'idle' : idle,
-
-    'client_server' : client_server
+    'disc' : disconnect,
+    'client_server' : client_server,
 }
 
 AUTO = None
