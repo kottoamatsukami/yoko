@@ -179,8 +179,9 @@ class YokoSync:
                 current_time = time.time()
                 ping_millis = (current_time - package['time']) * 1000
                 if ping_millis > HIGH_PING:
-                    print(f'[FIREWALL]: Ping is too high: {ping_millis:.3f}/{HIGH_PING:.3f} ms. Disconnected')
-                    self.disconnect()
+                    pass
+                    # print(f'[FIREWALL]: Ping is too high: {ping_millis:.3f}/{HIGH_PING:.3f} ms. Disconnected')
+                    # self.disconnect()
                 self.ping = ping_millis
             else:
                 self.__put_to_buffer(package)
