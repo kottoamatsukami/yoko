@@ -9,18 +9,17 @@ import json
 import time
 import stun
 
-PING_DELAY_SEC = 1
-HIGH_PING     = 1000
-RECV_BUFFSIZE = 1024
-BUFFER_SIZE   = 256
+# UDPHP Supporting
+PING_SENDING_DELAY       = 1000  # ms
+PING_FOR_AUTO_DISCONNECT = 5000  # ms
 
-HASH_PREFIX_SIZE = 10
-MAX_PACKAGE_SIZE = 25
-MAX_SEND_ATTEMPTS = 5
-HEADER_ATTEMPTS   = 5
-HEADER_ATTEMPTS_TIMEOUT = 0.1
-MISSING_ATTEMPTS  = 5
-MISSING_ATTEMPTS_DELAY = 0.05
+# Buffers
+BUFFER_PACKAGE_SIZE = 256   # packages
+BUFFER_RECV_SIZE    = 1024  # bytes
+
+# Package manipulation
+LEN_OF_PACKAGE_HASH = 10  # symbols
+MAX_PACKAGE_SIZE    = 25  # bytes
 
 
 class YokoSync:
@@ -31,9 +30,9 @@ class YokoSync:
         self.socket.bind(bind_addr)
         self.bind_addr   = bind_addr
         self.target_addr = None
-        self.buffer      = Queue(maxsize=BUFFER_SIZE)
+        self.buffer      = Queue(maxsize=BUFFER_PACKAGE_SIZE)
 
-        self._last_pong  = pong()
+        self._last_pong  = {'class': PONG, 'time': time.time()}
         self.ping        = float('inf')
 
         thread.start_new_thread(self.__thread_firewall, ())
@@ -59,7 +58,7 @@ class YokoSync:
     def send(self, package: dict):
         self.zero_buffer()
         json_package = json.dumps(package).encode('utf-8')
-        package_hash = sha256(json_package).hexdigest()[:HASH_PREFIX_SIZE]
+        package_hash = sha256(json_package).hexdigest()[:LEN_OF_PACKAGE_HASH]
 
         packages = {}
         for order in range(len(json_package) // MAX_PACKAGE_SIZE + (len(json_package) % MAX_PACKAGE_SIZE != 0)):
@@ -157,15 +156,15 @@ class YokoSync:
     def __thread_udphp(self):
         while True:
             if self.target_addr is not None:
-                self.__send(ping())
-            time.sleep(PING_DELAY_SEC)
+                self.__send({'class': PING, 'time': time.time()})
+            time.sleep(PING_SENDING_DELAY)
 
     def __thread_firewall(self):
         while True:
             if self.target_addr is None:
                 continue  # timeout
 
-            data, address = self.socket.recvfrom(RECV_BUFFSIZE)
+            data, address = self.socket.recvfrom(BUFFER_RECV_SIZE)
             if address != self.target_addr:
                 print("[FIREWALL Service]: Unexpected address detected")
                 continue
@@ -174,15 +173,15 @@ class YokoSync:
                 continue
 
             if package['class'] == PING:
-                self.__send(pong())
+                self.__send({'class': PONG, 'time': package['time']})
+
             elif package['class'] == PONG:
-                current_time = time.time()
-                ping_millis = (current_time - package['time']) * 1000
-                if ping_millis > HIGH_PING:
-                    pass
-                    # print(f'[FIREWALL]: Ping is too high: {ping_millis:.3f}/{HIGH_PING:.3f} ms. Disconnected')
-                    # self.disconnect()
+                ping_millis = (time.time() - package['time']) * 1000
+                if ping_millis > PING_FOR_AUTO_DISCONNECT:
+                    print(f'[FIREWALL]: Ping is too high: {ping_millis:.3f}/{PING_FOR_AUTO_DISCONNECT:.3f} ms. Disconnected')
+                    self.disconnect()
                 self.ping = ping_millis
+
             else:
                 self.__put_to_buffer(package)
 
@@ -214,7 +213,7 @@ class YokoSync:
         return self.ping
 
     def zero_buffer(self):
-        self.buffer = Queue(maxsize=BUFFER_SIZE)
+        self.buffer = Queue(maxsize=BUFFER_PACKAGE_SIZE)
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}({self.target_addr}/{self.is_alive}): ping={self.ping:.3f}, buffer={self.buffer.qsize()}"
